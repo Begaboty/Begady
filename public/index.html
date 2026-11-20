@@ -1,0 +1,494 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wichteln</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎁</text></svg>">
+<style>
+  :root {
+    --bg: #f6f1ea;
+    --card: #ffffff;
+    --text: #2b2420;
+    --muted: #7a6e66;
+    --line: #e6ddd3;
+    --accent: #b3261e;
+    --accent-dark: #8c1d17;
+    --green: #2f6b4a;
+    --green-soft: #e3efe7;
+    --red-soft: #f7e3e1;
+    --radius: 16px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+  }
+  main { max-width: 520px; margin: 0 auto; padding: 32px 16px 64px; }
+  header { text-align: center; margin-bottom: 24px; }
+  header .logo { font-size: 48px; line-height: 1; }
+  header h1 { margin: 8px 0 4px; font-size: 28px; letter-spacing: -0.02em; }
+  header p { margin: 0; color: var(--muted); }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 24px;
+    box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 24px rgba(60,30,10,.06);
+  }
+  .card + .card { margin-top: 16px; }
+  h2 { margin: 0 0 16px; font-size: 20px; }
+  label { display: block; font-weight: 600; font-size: 14px; margin: 16px 0 6px; }
+  label:first-of-type { margin-top: 0; }
+  input, select, textarea {
+    width: 100%;
+    font: inherit;
+    padding: 12px 14px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: #fff;
+    color: var(--text);
+  }
+  textarea { min-height: 120px; resize: vertical; }
+  input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
+  button {
+    font: inherit;
+    font-weight: 600;
+    border: 0;
+    border-radius: 10px;
+    padding: 12px 18px;
+    cursor: pointer;
+    background: var(--accent);
+    color: #fff;
+  }
+  button:hover { background: var(--accent-dark); }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  button.secondary { background: transparent; color: var(--text); border: 1px solid var(--line); }
+  button.secondary:hover { background: var(--bg); }
+  button.small { padding: 6px 10px; font-size: 13px; }
+  button.block { width: 100%; margin-top: 20px; }
+  .hint { font-size: 14px; color: var(--muted); margin: 8px 0 0; }
+  .msg { margin-top: 16px; padding: 10px 14px; border-radius: 10px; font-size: 14px; }
+  .msg.error { background: var(--red-soft); color: var(--accent-dark); }
+  .msg.ok { background: var(--green-soft); color: var(--green); }
+  .row { display: flex; gap: 8px; align-items: center; justify-content: space-between; }
+  .muted { color: var(--muted); }
+  .center { text-align: center; }
+  .hidden { display: none !important; }
+
+  /* Ziehen */
+  .gift-btn {
+    display: block;
+    margin: 8px auto 0;
+    width: 180px; height: 180px;
+    border-radius: 50%;
+    font-size: 72px;
+    background: var(--red-soft);
+    color: inherit;
+    transition: transform .15s;
+  }
+  .gift-btn:hover { background: #f2d2ce; transform: scale(1.04); }
+  .gift-btn.shaking { animation: shake .5s infinite; }
+  @keyframes shake {
+    0%,100% { transform: rotate(0); }
+    25% { transform: rotate(-10deg); }
+    75% { transform: rotate(10deg); }
+  }
+  .result-name {
+    font-size: 34px;
+    font-weight: 700;
+    color: var(--accent);
+    margin: 8px 0 4px;
+    word-break: break-word;
+  }
+  .reveal { animation: pop .5s ease-out; }
+  @keyframes pop { from { transform: scale(.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+  /* Admin-Liste */
+  ul.people { list-style: none; padding: 0; margin: 0; }
+  ul.people li {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 10px 0; border-bottom: 1px solid var(--line);
+  }
+  ul.people li:last-child { border-bottom: 0; }
+  .badges { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 2px; }
+  .badge { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--bg); color: var(--muted); }
+  .badge.yes { background: var(--green-soft); color: var(--green); }
+  .stats { display: flex; gap: 12px; margin-bottom: 16px; }
+  .stat { flex: 1; background: var(--bg); border-radius: 12px; padding: 12px; text-align: center; }
+  .stat b { display: block; font-size: 24px; }
+  .stat span { font-size: 13px; color: var(--muted); }
+  footer { text-align: center; margin-top: 32px; font-size: 14px; }
+  footer a { color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="logo">🎁</div>
+    <h1>Wichteln</h1>
+    <p>Zieh deinen Wichtel – geheim und fair.</p>
+  </header>
+
+  <!-- Spieler: Anmeldung -->
+  <section id="view-login" class="card hidden">
+    <h2>Anmelden</h2>
+    <form id="login-form">
+      <label for="login-name">Wer bist du?</label>
+      <select id="login-name" required></select>
+      <label for="login-password">Passwort</label>
+      <input id="login-password" type="password" autocomplete="current-password" required>
+      <div id="repeat-wrap" class="hidden">
+        <label for="login-password2">Passwort wiederholen</label>
+        <input id="login-password2" type="password" autocomplete="new-password">
+      </div>
+      <p id="login-hint" class="hint"></p>
+      <button class="block" type="submit">Weiter</button>
+      <div id="login-msg" class="msg hidden"></div>
+    </form>
+  </section>
+
+  <section id="view-empty" class="card center hidden">
+    <h2>Noch niemand dabei</h2>
+    <p class="muted">Die Spielleitung hat noch keine Teilnehmer eingetragen.</p>
+  </section>
+
+  <!-- Spieler: Ziehen / Ergebnis -->
+  <section id="view-player" class="card center hidden">
+    <p class="muted" style="margin-top:0">Hallo <b id="player-name"></b>!</p>
+    <div id="draw-area">
+      <h2>Bereit, deinen Wichtel zu ziehen?</h2>
+      <button id="draw-btn" class="gift-btn" aria-label="Namen ziehen">🎁</button>
+      <p class="hint">Tippe auf das Geschenk. Du kannst nur einmal ziehen.</p>
+    </div>
+    <div id="result-area" class="hidden">
+      <p class="muted" style="margin:0">Du beschenkst</p>
+      <div id="result-name" class="result-name"></div>
+      <p class="hint">Psst – nicht verraten! Du kannst dich jederzeit wieder anmelden, um den Namen nachzusehen.</p>
+    </div>
+    <div id="player-msg" class="msg hidden"></div>
+    <button class="secondary block" id="logout-btn">Abmelden</button>
+  </section>
+
+  <!-- Admin: Einrichtung / Anmeldung -->
+  <section id="view-admin-auth" class="card hidden">
+    <h2 id="admin-auth-title">Spielleitung</h2>
+    <form id="admin-auth-form">
+      <p id="admin-auth-hint" class="hint" style="margin-top:0"></p>
+      <label for="admin-password">Passwort der Spielleitung</label>
+      <input id="admin-password" type="password" autocomplete="current-password" required>
+      <button class="block" type="submit">Weiter</button>
+      <div id="admin-auth-msg" class="msg hidden"></div>
+    </form>
+  </section>
+
+  <!-- Admin: Verwaltung -->
+  <section id="view-admin" class="hidden">
+    <div class="card">
+      <div class="row" style="margin-bottom:16px">
+        <h2 style="margin:0">Teilnehmer</h2>
+        <button class="secondary small" id="admin-logout-btn">Abmelden</button>
+      </div>
+      <div class="stats">
+        <div class="stat"><b id="stat-total">0</b><span>Teilnehmer</span></div>
+        <div class="stat"><b id="stat-registered">0</b><span>angemeldet</span></div>
+        <div class="stat"><b id="stat-drawn">0</b><span>haben gezogen</span></div>
+      </div>
+      <ul id="people" class="people"></ul>
+      <p id="people-empty" class="hint hidden">Noch keine Teilnehmer. Füge unten Namen hinzu.</p>
+      <div id="admin-msg" class="msg hidden"></div>
+    </div>
+
+    <div class="card" id="add-card">
+      <h2>Namen hinzufügen</h2>
+      <form id="add-form">
+        <label for="add-names">Ein Name pro Zeile</label>
+        <textarea id="add-names" placeholder="Anna Müller&#10;Ben Schmidt&#10;Clara Weber"></textarea>
+        <button class="block" type="submit">Hinzufügen</button>
+      </form>
+    </div>
+    <div class="card hidden" id="locked-card">
+      <h2>Ziehung läuft</h2>
+      <p class="muted" style="margin-top:0">Sobald jemand gezogen hat, ist die Teilnehmerliste gesperrt, damit niemand übrig bleibt oder doppelt gezogen wird.</p>
+    </div>
+
+    <div class="card">
+      <h2>Ziehung zurücksetzen</h2>
+      <p class="muted" style="margin-top:0">Löscht alle gezogenen Namen. Alle müssen danach neu ziehen. Passwörter bleiben erhalten.</p>
+      <button class="secondary" id="reset-btn">Alle Ziehungen zurücksetzen</button>
+    </div>
+  </section>
+
+  <footer>
+    <a href="#" id="nav-player" class="hidden">Zur Teilnehmer-Ansicht</a>
+    <a href="#admin" id="nav-admin">Spielleitung</a>
+  </footer>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const views = ['view-login', 'view-empty', 'view-player', 'view-admin-auth', 'view-admin'];
+let state = null;
+
+function show(id) {
+  views.forEach((v) => $(v).classList.toggle('hidden', v !== id));
+  const admin = location.hash === '#admin';
+  $('nav-admin').classList.toggle('hidden', admin);
+  $('nav-player').classList.toggle('hidden', !admin);
+}
+
+function message(el, text, kind = 'error') {
+  el.textContent = text;
+  el.className = 'msg ' + kind;
+  el.classList.toggle('hidden', !text);
+}
+
+async function api(path, options = {}) {
+  const res = await fetch(path, {
+    method: options.method || 'GET',
+    headers: options.body ? { 'Content-Type': 'application/json' } : {},
+    body: options.body ? JSON.stringify(options.body) : undefined,
+    credentials: 'same-origin',
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw Object.assign(new Error(data.error || 'Etwas ist schiefgelaufen.'), { status: res.status });
+  return data;
+}
+
+async function render() {
+  state = await api('/api/state');
+  if (location.hash === '#admin') return renderAdmin();
+  if (state.role === 'player') return renderPlayer();
+  if (state.participants.length === 0) return show('view-empty');
+  renderLogin();
+}
+
+// ---------- Spieler ----------
+
+function renderLogin() {
+  const select = $('login-name');
+  const previous = select.value;
+  select.innerHTML = '';
+  const placeholder = new Option('Bitte Namen wählen …', '');
+  placeholder.disabled = true;
+  select.add(placeholder);
+  [...state.participants]
+    .sort((a, b) => a.name.localeCompare(b.name, 'de'))
+    .forEach((p) => select.add(new Option(p.name, p.id)));
+  select.value = state.participants.some((p) => p.id === previous) ? previous : '';
+  updateLoginHint();
+  message($('login-msg'), '');
+  show('view-login');
+}
+
+function updateLoginHint() {
+  const p = state.participants.find((x) => x.id === $('login-name').value);
+  const first = p && !p.registered;
+  $('repeat-wrap').classList.toggle('hidden', !first);
+  $('login-password2').required = Boolean(first);
+  $('login-password').autocomplete = first ? 'new-password' : 'current-password';
+  $('login-hint').textContent = !p
+    ? ''
+    : first
+      ? 'Erste Anmeldung: Lege jetzt ein Passwort fest (mind. 4 Zeichen). Damit kannst du später deinen gezogenen Namen wieder ansehen.'
+      : 'Willkommen zurück! Melde dich mit deinem Passwort an.';
+}
+
+$('login-name').addEventListener('change', updateLoginHint);
+
+$('login-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  try {
+    await api('/api/login', {
+      method: 'POST',
+      body: { id: $('login-name').value, password: $('login-password').value, passwordRepeat: $('login-password2').value },
+    });
+    $('login-password').value = '';
+    $('login-password2').value = '';
+    render();
+  } catch (err) {
+    message($('login-msg'), err.message);
+  }
+});
+
+async function renderPlayer() {
+  const me = await api('/api/me');
+  $('player-name').textContent = me.name;
+  message($('player-msg'), '');
+  if (me.drawn) {
+    showResult(me.drawn, false);
+  } else {
+    $('draw-area').classList.remove('hidden');
+    $('result-area').classList.add('hidden');
+    $('draw-btn').disabled = !me.canDraw;
+    if (!me.canDraw) message($('player-msg'), 'Es müssen mindestens 2 Personen mitmachen, bevor gezogen werden kann.');
+  }
+  show('view-player');
+}
+
+function showResult(name, animate) {
+  $('draw-area').classList.add('hidden');
+  $('result-area').classList.remove('hidden');
+  $('result-name').textContent = name;
+  $('result-name').classList.toggle('reveal', animate);
+}
+
+$('draw-btn').addEventListener('click', async () => {
+  const btn = $('draw-btn');
+  btn.disabled = true;
+  btn.classList.add('shaking');
+  try {
+    const [result] = await Promise.all([
+      api('/api/draw', { method: 'POST' }),
+      new Promise((r) => setTimeout(r, 1200)),
+    ]);
+    showResult(result.drawn, true);
+  } catch (err) {
+    message($('player-msg'), err.message);
+    btn.disabled = false;
+  } finally {
+    btn.classList.remove('shaking');
+  }
+});
+
+$('logout-btn').addEventListener('click', async () => {
+  await api('/api/logout', { method: 'POST' });
+  render();
+});
+
+// ---------- Spielleitung ----------
+
+function renderAdmin() {
+  if (state.role === 'admin') return loadAdmin();
+  const setup = !state.adminConfigured;
+  $('admin-auth-title').textContent = setup ? 'Spielleitung einrichten' : 'Spielleitung';
+  $('admin-auth-hint').textContent = setup
+    ? 'Du bist die erste Person hier. Lege ein Passwort für die Spielleitung fest, um Teilnehmer zu verwalten.'
+    : 'Melde dich an, um Teilnehmer zu verwalten.';
+  $('admin-password').autocomplete = setup ? 'new-password' : 'current-password';
+  message($('admin-auth-msg'), '');
+  show('view-admin-auth');
+}
+
+$('admin-auth-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  try {
+    const path = state.adminConfigured ? '/api/admin/login' : '/api/admin/setup';
+    await api(path, { method: 'POST', body: { password: $('admin-password').value } });
+    $('admin-password').value = '';
+    render();
+  } catch (err) {
+    message($('admin-auth-msg'), err.message);
+  }
+});
+
+async function loadAdmin() {
+  let overview;
+  try {
+    overview = await api('/api/admin/overview');
+  } catch (err) {
+    if (err.status === 401) { state.role = null; return renderAdmin(); }
+    throw err;
+  }
+  const list = $('people');
+  list.innerHTML = '';
+  overview.participants.forEach((p) => {
+    const li = document.createElement('li');
+    const info = document.createElement('div');
+    const name = document.createElement('div');
+    name.textContent = p.name;
+    name.style.fontWeight = '600';
+    const badges = document.createElement('div');
+    badges.className = 'badges';
+    badges.append(badge(p.registered ? 'angemeldet' : 'noch nicht angemeldet', p.registered));
+    badges.append(badge(p.hasDrawn ? 'hat gezogen' : 'hat noch nicht gezogen', p.hasDrawn));
+    info.append(name, badges);
+
+    const actions = document.createElement('div');
+    actions.className = 'row';
+    if (p.registered) {
+      actions.append(button('Passwort zurücksetzen', async () => {
+        if (!confirm(`Passwort von ${p.name} zurücksetzen? Die Person legt bei der nächsten Anmeldung ein neues fest.`)) return;
+        await adminAction(`/api/admin/participants/${p.id}/reset-password`, 'POST', 'Passwort wurde zurückgesetzt.');
+      }));
+    }
+    if (!overview.locked) {
+      actions.append(button('Entfernen', async () => {
+        if (!confirm(`${p.name} entfernen?`)) return;
+        await adminAction(`/api/admin/participants/${p.id}`, 'DELETE', `${p.name} wurde entfernt.`);
+      }));
+    }
+    li.append(info, actions);
+    list.append(li);
+  });
+  $('people-empty').classList.toggle('hidden', overview.participants.length > 0);
+  $('stat-total').textContent = overview.participants.length;
+  $('stat-registered').textContent = overview.participants.filter((p) => p.registered).length;
+  $('stat-drawn').textContent = overview.participants.filter((p) => p.hasDrawn).length;
+  $('add-card').classList.toggle('hidden', overview.locked);
+  $('locked-card').classList.toggle('hidden', !overview.locked);
+  show('view-admin');
+}
+
+function badge(text, yes) {
+  const b = document.createElement('span');
+  b.className = 'badge' + (yes ? ' yes' : '');
+  b.textContent = text;
+  return b;
+}
+
+function button(text, onClick) {
+  const b = document.createElement('button');
+  b.className = 'secondary small';
+  b.textContent = text;
+  b.addEventListener('click', onClick);
+  return b;
+}
+
+async function adminAction(path, method, okText, body) {
+  try {
+    const result = await api(path, { method, body });
+    await loadAdmin();
+    message($('admin-msg'), typeof okText === 'function' ? okText(result) : okText, 'ok');
+  } catch (err) {
+    message($('admin-msg'), err.message);
+  }
+}
+
+$('add-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const names = $('add-names').value.split('\n').map((n) => n.trim()).filter(Boolean);
+  if (!names.length) return;
+  await adminAction('/api/admin/participants', 'POST', (r) => {
+    let text = `${r.added.length} hinzugefügt.`;
+    if (r.skipped.length) text += ` Übersprungen (doppelt oder zu lang): ${r.skipped.join(', ')}`;
+    return text;
+  }, { names });
+  $('add-names').value = '';
+});
+
+$('reset-btn').addEventListener('click', async () => {
+  if (!confirm('Wirklich alle Ziehungen zurücksetzen? Alle müssen neu ziehen.')) return;
+  await adminAction('/api/admin/reset-draws', 'POST', 'Alle Ziehungen wurden zurückgesetzt.');
+});
+
+$('admin-logout-btn').addEventListener('click', async () => {
+  await api('/api/logout', { method: 'POST' });
+  render();
+});
+
+$('nav-player').addEventListener('click', (e) => {
+  e.preventDefault();
+  history.pushState(null, '', location.pathname);
+  render();
+});
+
+window.addEventListener('hashchange', render);
+render().catch((err) => alert(err.message));
+</script>
+</body>
+</html>

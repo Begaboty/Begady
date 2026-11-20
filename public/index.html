@@ -53,6 +53,9 @@
     background: #fff;
     color: var(--text);
   }
+  .code-input { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 22px; letter-spacing: .12em; text-align: center; text-transform: uppercase; }
+  .code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px; letter-spacing: .06em; background: var(--bg); padding: 2px 8px; border-radius: 6px; }
+  .actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
   textarea { min-height: 120px; resize: vertical; }
   input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
   button {
@@ -138,15 +141,9 @@
   <section id="view-login" class="card hidden">
     <h2>Anmelden</h2>
     <form id="login-form">
-      <label for="login-name">Wer bist du?</label>
-      <select id="login-name" required></select>
-      <label for="login-password">Passwort</label>
-      <input id="login-password" type="password" autocomplete="current-password" required>
-      <div id="repeat-wrap" class="hidden">
-        <label for="login-password2">Passwort wiederholen</label>
-        <input id="login-password2" type="password" autocomplete="new-password">
-      </div>
-      <p id="login-hint" class="hint"></p>
+      <label for="login-code">Dein persönlicher Zugangscode</label>
+      <input id="login-code" class="code-input" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX" maxlength="12" required>
+      <p class="hint">Den Code hast du von der Spielleitung bekommen. Mit demselben Code kannst du später jederzeit nachsehen, wen du gezogen hast.</p>
       <button class="block" type="submit">Weiter</button>
       <div id="login-msg" class="msg hidden"></div>
     </form>
@@ -191,7 +188,10 @@
     <div class="card">
       <div class="row" style="margin-bottom:16px">
         <h2 style="margin:0">Teilnehmer</h2>
-        <button class="secondary small" id="admin-logout-btn">Abmelden</button>
+        <div class="actions">
+          <button class="secondary small" id="copy-all-btn">Alle Codes kopieren</button>
+          <button class="secondary small" id="admin-logout-btn">Abmelden</button>
+        </div>
       </div>
       <div class="stats">
         <div class="stat"><b id="stat-total">0</b><span>Teilnehmer</span></div>
@@ -200,6 +200,7 @@
       </div>
       <ul id="people" class="people"></ul>
       <p id="people-empty" class="hint hidden">Noch keine Teilnehmer. Füge unten Namen hinzu.</p>
+      <p class="hint">Gib jeder Person ihren Code oder ihren persönlichen Link. Der Link meldet direkt an.</p>
       <div id="admin-msg" class="msg hidden"></div>
     </div>
 
@@ -218,7 +219,7 @@
 
     <div class="card">
       <h2>Ziehung zurücksetzen</h2>
-      <p class="muted" style="margin-top:0">Löscht alle gezogenen Namen. Alle müssen danach neu ziehen. Passwörter bleiben erhalten.</p>
+      <p class="muted" style="margin-top:0">Löscht alle gezogenen Namen. Alle müssen danach neu ziehen. Die Zugangscodes bleiben gleich.</p>
       <button class="secondary" id="reset-btn">Alle Ziehungen zurücksetzen</button>
     </div>
   </section>
@@ -263,56 +264,39 @@ async function render() {
   state = await api('/api/state');
   if (location.hash === '#admin') return renderAdmin();
   if (state.role === 'player') return renderPlayer();
-  if (state.participants.length === 0) return show('view-empty');
+  const urlCode = new URLSearchParams(location.search).get('code');
+  if (urlCode) {
+    history.replaceState(null, '', location.pathname + location.hash);
+    $('login-code').value = urlCode;
+    if (await login(urlCode)) return;
+  }
+  if (!state.hasParticipants) return show('view-empty');
   renderLogin();
 }
 
 // ---------- Spieler ----------
 
 function renderLogin() {
-  const select = $('login-name');
-  const previous = select.value;
-  select.innerHTML = '';
-  const placeholder = new Option('Bitte Namen wählen …', '');
-  placeholder.disabled = true;
-  select.add(placeholder);
-  [...state.participants]
-    .sort((a, b) => a.name.localeCompare(b.name, 'de'))
-    .forEach((p) => select.add(new Option(p.name, p.id)));
-  select.value = state.participants.some((p) => p.id === previous) ? previous : '';
-  updateLoginHint();
-  message($('login-msg'), '');
   show('view-login');
 }
 
-function updateLoginHint() {
-  const p = state.participants.find((x) => x.id === $('login-name').value);
-  const first = p && !p.registered;
-  $('repeat-wrap').classList.toggle('hidden', !first);
-  $('login-password2').required = Boolean(first);
-  $('login-password').autocomplete = first ? 'new-password' : 'current-password';
-  $('login-hint').textContent = !p
-    ? ''
-    : first
-      ? 'Erste Anmeldung: Lege jetzt ein Passwort fest (mind. 4 Zeichen). Damit kannst du später deinen gezogenen Namen wieder ansehen.'
-      : 'Willkommen zurück! Melde dich mit deinem Passwort an.';
-}
-
-$('login-name').addEventListener('change', updateLoginHint);
-
-$('login-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
+async function login(code) {
   try {
-    await api('/api/login', {
-      method: 'POST',
-      body: { id: $('login-name').value, password: $('login-password').value, passwordRepeat: $('login-password2').value },
-    });
-    $('login-password').value = '';
-    $('login-password2').value = '';
-    render();
+    await api('/api/login', { method: 'POST', body: { code } });
+    $('login-code').value = '';
+    message($('login-msg'), '');
+    await render();
+    return true;
   } catch (err) {
     message($('login-msg'), err.message);
+    show('view-login');
+    return false;
   }
+}
+
+$('login-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  login($('login-code').value);
 });
 
 async function renderPlayer() {
@@ -404,18 +388,21 @@ async function loadAdmin() {
     name.style.fontWeight = '600';
     const badges = document.createElement('div');
     badges.className = 'badges';
+    const code = document.createElement('span');
+    code.className = 'code';
+    code.textContent = p.code;
+    badges.append(code);
     badges.append(badge(p.registered ? 'angemeldet' : 'noch nicht angemeldet', p.registered));
     badges.append(badge(p.hasDrawn ? 'hat gezogen' : 'hat noch nicht gezogen', p.hasDrawn));
     info.append(name, badges);
 
     const actions = document.createElement('div');
-    actions.className = 'row';
-    if (p.registered) {
-      actions.append(button('Passwort zurücksetzen', async () => {
-        if (!confirm(`Passwort von ${p.name} zurücksetzen? Die Person legt bei der nächsten Anmeldung ein neues fest.`)) return;
-        await adminAction(`/api/admin/participants/${p.id}/reset-password`, 'POST', 'Passwort wurde zurückgesetzt.');
-      }));
-    }
+    actions.className = 'actions';
+    actions.append(button('Link kopieren', () => copy(personalLink(p), `Link für ${p.name} kopiert.`)));
+    actions.append(button('Neuer Code', async () => {
+      if (!confirm(`Neuen Code für ${p.name} erzeugen? Der alte Code und Link funktionieren dann nicht mehr.`)) return;
+      await adminAction(`/api/admin/participants/${p.id}/new-code`, 'POST', `${p.name} hat einen neuen Code.`);
+    }));
     if (!overview.locked) {
       actions.append(button('Entfernen', async () => {
         if (!confirm(`${p.name} entfernen?`)) return;
@@ -425,6 +412,8 @@ async function loadAdmin() {
     li.append(info, actions);
     list.append(li);
   });
+  lastOverview = overview;
+  $('copy-all-btn').classList.toggle('hidden', overview.participants.length === 0);
   $('people-empty').classList.toggle('hidden', overview.participants.length > 0);
   $('stat-total').textContent = overview.participants.length;
   $('stat-registered').textContent = overview.participants.filter((p) => p.registered).length;
@@ -433,6 +422,27 @@ async function loadAdmin() {
   $('locked-card').classList.toggle('hidden', !overview.locked);
   show('view-admin');
 }
+
+let lastOverview = null;
+
+function personalLink(p) {
+  return `${location.origin}${location.pathname}?code=${p.code}`;
+}
+
+async function copy(text, okText) {
+  try {
+    await navigator.clipboard.writeText(text);
+    message($('admin-msg'), okText, 'ok');
+  } catch {
+    window.prompt('Zum Kopieren markieren:', text);
+  }
+}
+
+$('copy-all-btn').addEventListener('click', () => {
+  if (!lastOverview) return;
+  const lines = lastOverview.participants.map((p) => `${p.name}: ${p.code}  ${personalLink(p)}`);
+  copy(lines.join('\n'), 'Alle Codes und Links kopiert.');
+});
 
 function badge(text, yes) {
   const b = document.createElement('span');

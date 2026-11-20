@@ -37,6 +37,44 @@ function save() {
   fs.renameSync(tmp, DATA_FILE);
 }
 
+// ---------- Zugangscodes ----------
+
+// Ohne leicht verwechselbare Zeichen (0/O, 1/I/L)
+const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+
+function normalizeCode(code) {
+  return String(code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+}
+
+function generateCode() {
+  const used = new Set(data.participants.map((p) => p.code));
+  let code;
+  do {
+    code = Array.from({ length: 8 }, () => CODE_ALPHABET[crypto.randomInt(CODE_ALPHABET.length)]).join('');
+  } while (used.has(code));
+  return code;
+}
+
+function formatCode(code) {
+  return code.slice(0, 4) + '-' + code.slice(4);
+}
+
+// Ältere Datenbestände (mit Passwörtern) auf Zugangscodes umstellen
+function migrate() {
+  let changed = false;
+  for (const p of data.participants) {
+    if (!p.code) {
+      p.code = generateCode();
+      changed = true;
+    }
+    if ('password' in p) {
+      delete p.password;
+      changed = true;
+    }
+  }
+  if (changed) save();
+}
+
 // ---------- Passwörter & Sitzungen ----------
 
 function hashPassword(password, salt = crypto.randomBytes(16).toString('hex')) {
@@ -178,10 +216,6 @@ function serveStatic(req, res) {
   });
 }
 
-function publicParticipant(p) {
-  return { id: p.id, name: p.name, registered: Boolean(p.password) };
-}
-
 function validPassword(pw) {
   return typeof pw === 'string' && pw.length >= 4 && pw.length <= 200;
 }
@@ -202,7 +236,7 @@ async function handleApi(req, res, pathname) {
   if (method === 'GET' && pathname === '/api/state') {
     return send(res, 200, {
       adminConfigured: Boolean(data.admin),
-      participants: data.participants.map(publicParticipant),
+      hasParticipants: data.participants.length > 0,
       role: isAdmin ? 'admin' : player ? 'player' : null,
     });
   }
@@ -211,17 +245,13 @@ async function handleApi(req, res, pathname) {
 
   if (method === 'POST' && pathname === '/api/login') {
     if (tooManyAttempts(ip)) return send(res, 429, { error: 'Zu viele Fehlversuche. Bitte in 10 Minuten erneut versuchen.' });
-    const p = data.participants.find((x) => x.id === body.id);
-    if (!p) return send(res, 404, { error: 'Diesen Namen gibt es nicht.' });
-    if (!p.password) {
-      // Erste Anmeldung: Passwort wird festgelegt
-      if (!validPassword(body.password)) return send(res, 400, { error: 'Das Passwort muss mindestens 4 Zeichen haben.' });
-      if (body.password !== body.passwordRepeat) return send(res, 400, { error: 'Die Passwörter stimmen nicht überein.' });
-      p.password = hashPassword(body.password);
-    } else if (!checkPassword(String(body.password || ''), p.password)) {
+    const code = normalizeCode(body.code);
+    const p = code.length === 8 ? data.participants.find((x) => x.code === code) : null;
+    if (!p) {
       recordFailure(ip);
-      return send(res, 401, { error: 'Falsches Passwort.' });
+      return send(res, 401, { error: 'Dieser Zugangscode ist ungültig.' });
     }
+    if (!p.firstLoginAt) p.firstLoginAt = new Date().toISOString();
     pruneSessions();
     const token = createSession('player', p.id);
     save();
@@ -293,7 +323,10 @@ async function handleApi(req, res, pathname) {
     return send(res, 200, {
       locked: drawStarted(),
       participants: data.participants.map((p) => ({
-        ...publicParticipant(p),
+        id: p.id,
+        name: p.name,
+        code: formatCode(p.code),
+        registered: Boolean(p.firstLoginAt),
         hasDrawn: Boolean(p.drawnId),
         wasDrawn: takenIds.has(p.id),
       })),
@@ -315,7 +348,8 @@ async function handleApi(req, res, pathname) {
         continue;
       }
       existing.add(name.toLowerCase());
-      const p = { id: crypto.randomUUID(), name, password: null, drawnId: null };
+      const p = { id: crypto.randomUUID(), name, code: null, drawnId: null };
+      p.code = generateCode();
       data.participants.push(p);
       added.push(p.name);
     }
@@ -323,13 +357,14 @@ async function handleApi(req, res, pathname) {
     return send(res, 200, { added, skipped });
   }
 
-  const participantRoute = pathname.match(/^\/api\/admin\/participants\/([\w-]+)(\/reset-password)?$/);
+  const participantRoute = pathname.match(/^\/api\/admin\/participants\/([\w-]+)(\/new-code)?$/);
   if (participantRoute) {
     const p = data.participants.find((x) => x.id === participantRoute[1]);
     if (!p) return send(res, 404, { error: 'Person nicht gefunden.' });
 
     if (method === 'POST' && participantRoute[2]) {
-      p.password = null;
+      p.code = generateCode();
+      delete p.firstLoginAt;
       for (const [token, s] of Object.entries(data.sessions)) {
         if (s.type === 'player' && s.id === p.id) delete data.sessions[token];
       }
@@ -355,6 +390,8 @@ async function handleApi(req, res, pathname) {
 
   return send(res, 404, { error: 'Unbekannte Anfrage.' });
 }
+
+migrate();
 
 const server = http.createServer(async (req, res) => {
   const { pathname } = new URL(req.url, 'http://x');

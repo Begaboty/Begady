@@ -35,3 +35,22 @@ Sobald die erste Person gezogen hat, ist die Teilnehmerliste gesperrt. Wer nacht
 ```bash
 npm test
 ```
+
+---
+
+# 🎲 Spielekiste (gegen Langeweile)
+
+Eine eigenständige Web-App mit acht kleinen Spielen in `langeweile/index.html`: Datei einfach im Browser öffnen, sie braucht keinen Server und keine Installation. Läuft auf Handy und Computer.
+
+| Spiel | Worum es geht | Rekord |
+|---|---|---|
+| Drei gewinnt | X und O, gegen den Computer oder zu zweit | Siege gegen den Computer |
+| Memory | Acht Paare finden | Wenigste Züge |
+| Schlange | Äpfel fressen, wachsen, nicht anstoßen (Pfeiltasten, Wischen, Steuerkreuz) | Meiste Äpfel |
+| Zahlenraten | Zahl von 1 bis 100 mit „höher/niedriger“-Tipps | Wenigste Versuche |
+| Reaktionstest | Tippen, sobald es grün wird | Schnellste Zeit (ms) |
+| Schere, Stein, Papier | Gegen den Computer | Längste Siegesserie |
+| Farbfolge | Eine wachsende Farb- und Tonfolge nachspielen | Höchste Stufe |
+| Maulwurf hauen | 30 Sekunden lang Maulwürfe treffen | Meiste Treffer |
+
+„Überrasch mich“ startet ein zufälliges Spiel. Rekorde werden nur im Browser des Geräts gespeichert.
